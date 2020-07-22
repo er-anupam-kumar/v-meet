@@ -3,7 +3,10 @@ const express = require('express')
 const socketIO = require('socket.io')
 import { Server as SocketIOServer } from "socket.io";
 import { createServer, Server as HTTPServer } from "http";
-const path    = require('path')
+const path = require('path')
+const userRouters = require('./routers/user')
+const otpRouters = require('./routers/otp')
+
 
 export class Server {
   private httpServer: HTTPServer;
@@ -29,20 +32,27 @@ export class Server {
   }
 
   private configureApp(): void {
-    this.app.use(express.static(path.join(__dirname, "../public")));
-  }
-
-  private configureRoutes(): void {
-    this.app.get("/", (req, res) => {
-      res.sendFile("index.html");
+    // this.app.use(express.static(path.join(__dirname, "../public")));
+    this.app.use(function (req, res, next) {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With,Authorization, Content-Type, Accept");
+      next();
     });
   }
 
+  private configureRoutes(): void {
+    this.app.use(userRouters)
+    this.app.use(otpRouters)
+  }
+
+
   private handleSocketConnection(): void {
     this.io.on("connection", socket => {
+      console.log('New connection joined')
+
       const existingSocket = this.activeSockets.find(
         existingSocket => existingSocket === socket.id
-        );
+      );
 
       if (!existingSocket) {
         this.activeSockets.push(socket.id);
@@ -50,7 +60,7 @@ export class Server {
         socket.emit("update-user-list", {
           users: this.activeSockets.filter(
             existingSocket => existingSocket !== socket.id
-            )
+          )
         });
 
         socket.broadcast.emit("update-user-list", {
@@ -81,7 +91,7 @@ export class Server {
       socket.on("disconnect", () => {
         this.activeSockets = this.activeSockets.filter(
           existingSocket => existingSocket !== socket.id
-          );
+        );
         socket.broadcast.emit("remove-user", {
           socketId: socket.id
         });
